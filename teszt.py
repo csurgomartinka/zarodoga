@@ -1,76 +1,100 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import time
-import schedule
-from datetime import datetime
-
-# URL, amelyről az adatokat le szeretnénk tölteni
-url = 'https://csodalatosmagyarorszag.hu/kategoria/programok/'
 
 
+# URL listája
+urls = [
+    'https://www.programturizmus.hu/kategoria-fesztival.html',
+    'https://www.programturizmus.hu/kategoria-vasarok.html',
+    'https://www.programturizmus.hu/kategoria-unnepek.html',
+    'https://www.programturizmus.hu/kategoria-szabadido.html',
+    'https://www.programturizmus.hu/kategoria-kulturalis-program.html', 
+    'https://www.programturizmus.hu/kategoria-csalad-gyerek.html',
+    'https://www.programturizmus.hu/kategoria-gasztronomiai-program.html',
+    'https://www.programturizmus.hu/kategoria-rendezveny.html'
+]
+'''
+'https://www.programturizmus.hu/kategoria-fesztival.html',              #ez működik
+'https://www.programturizmus.hu/kategoria-vasarok.html',                #elvileg működik
+'https://www.programturizmus.hu/kategoria-unnepek.html',                #elvileg jó
+'https://www.programturizmus.hu/kategoria-szabadido.html',              #elvileg jó
+'https://www.programturizmus.hu/kategoria-kulturalis-program.html',     #elvileg jó
+'https://www.programturizmus.hu/kategoria-csalad-gyerek.html',          #elvileg jó
+'https://www.programturizmus.hu/kategoria-gasztronomiai-program.html',  #elvileg jó
+'https://www.programturizmus.hu/kategoria-rendezveny.html'              #elvileg jó
+'''
 
-# User-Agent beállítása a kéréshez
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-}
+varosok = requests.get("http://localhost:3000/varosLista")
+esemenyek = requests.get("http://localhost:3000/esemenyLista")
+varosokjol = json.loads(varosok.text)
+esemenyekjol = json.loads(esemenyek.text)
+#for a in varosokjol:
+    #print(a)
 
-def fetch_and_save_events():
-    # Az oldal lekérése a megadott User-Agent fejléc használatával
-    response = requests.get(url, headers=headers)
+#esemeny    - helyszinid
+#helyszin   - helyszin_nev varosid
 
-    # Ellenőrizzük a válasz státuszkódját
-    if response.status_code != 200:
-        print(f"Hiba történt: {response.status_code}")
-    else:
-        # Az oldal HTML kódja
-        soup = BeautifulSoup(response.text, 'html.parser')
+tipusid = 1
 
-        # Keresés az eseményekre (például a post-shadow osztályú article-ök)
-        events = soup.find_all('article', class_='post shadow col mb20 n100')
+# URL-ek feldolgozása
+for url in urls:
+    print(f"Feldolgozás: {url}")
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Ha nem találunk eseményeket
-        if not events:
-            print("Nem találhatóak események.")
-        else:
-            # Események adatainak kinyerése
-            event_list = []
-            for event in events:
-                event_data = {}
+    # Események keresése
+    events = soup.find_all('div', class_='tourism-list destination-list has-list-order')
+    esemeny = soup.find_all('div',class_='tourism-list-item')
+    #print(esemeny[0])
 
-                # Dátum kinyerése
-                date = event.find('h4', class_='post_date date_badge bred mb10')
-                if date:
-                    event_data['date'] = date.get_text(strip=True)
+    
+    for a in esemeny:
+        datum = a.find('span',class_='tourism_time')
+        #print(datum)
+        try:
+            for b in datum:
+                print(b) #esemény dátuma
+            h3 = a.find('h3')
+            nev = h3.find('a')
+            #print(nev)
+            event_name = nev.get_text(strip=True)
+            event_link = "https://www.programturizmus.hu" + nev['href']
+            #helyszin = requests.get(event_link)
+            #helyszin_soup = BeautifulSoup(helyszin.text, 'html.parser')
+            #destination_div = helyszin_soup.find('div', class_='destination-address')
+            #print(destination_div)
+            #print(event_link)
+            for c in nev:
+                print(c) #esemény címe
+            varosdiv = a.find('div',class_='tourism_path_list')
+            #print(varosdiv)
+            for k in varosdiv:
+                for l in k:
+                    #print(l)
+                    varosa = l.find('a')
+                    if "telepules" in str(varosa):
+                        for o in varosa:
+                            print(o) #esemény városa
+                            for p in varosokjol:
+                                #print(p)
+                                #{'vnev': 'Villány'}
+                                #print("{\'vnev\': \'" + o + "\'}")
+                                if("{\'vnev\': \'" + o + "\'}" == str(p)):
+                                    print("találat")         #helyszinnek a város idja                        
+            leiras = a.find('p',class_='tourism-descrition')
+            #print(leiras)
+            for e in leiras:
+                print(e) #esemény leírás
+        except:
+            print("")
+        
+        #tipusid hozzáadása
+        print(tipusid) #esemény tipusának idja
+        print("--------------------------------------------------------------------------------------------------------------------------------------")
+    tipusid += 1
+    
+        
+        
+        
 
-                # Cím kinyerése
-                title = event.find('h3', class_='post_title fs24px mb20 cdgrey')
-                if title:
-                    event_data['title'] = title.get_text(strip=True)
-
-                # Helyszín kinyerése
-                location = event.find('h4', class_='post_city fs14px ib cblack')
-                if location:
-                    event_data['location'] = location.get_text(strip=True)
-
-                # Az adatokat hozzáadjuk az események listájához
-                if event_data:
-                    event_list.append(event_data)
-
-            # Frissítés dátumának rögzítése
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # JSON fájlba mentés a 'var tomb =' szintaxissal
-            with open('events_data.json', 'w', encoding='utf-8') as json_file:
-                # Írás a fájlba: 'var tomb = ' + JSON struktúra
-                json_file.write(f"var tomb = {json.dumps(event_list, ensure_ascii=False, indent=4)};\n")
-
-            print(f"{len(event_list)} eseményt találtunk, és sikeresen kiírtuk a 'events_data.json' fájlba.")
-
-# Feladat ütemezése
-schedule.every().day.at("00:00").do(fetch_and_save_events)
-
-# A scheduler futtatása
-while True:
-    schedule.run_pending()  # Ellenőrzi, hogy van-e futtatandó feladat
-    time.sleep(1)  # Vár egy kicsit, hogy ne terhelje a CPU-t
